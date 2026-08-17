@@ -2,6 +2,9 @@ import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
 
+const API_URL =
+    process.env.REACT_APP_API_URL || "http://localhost:5000";
+
 export default function Login() {
 
     const navigate = useNavigate();
@@ -27,7 +30,7 @@ export default function Login() {
 
         e.preventDefault();
 
-        if (!form.email || !form.password) {
+        if (!form.email.trim() || !form.password) {
 
             alert(
                 "Please enter email and password"
@@ -41,7 +44,7 @@ export default function Login() {
             setLoading(true);
 
             const res = await axios.post(
-                "http://localhost:5000/auth/login",
+                `${API_URL}/auth/login`,
                 {
                     email: form.email.trim(),
                     password: form.password
@@ -50,10 +53,13 @@ export default function Login() {
 
 
             // =========================
-            // CHECK TOKEN
+            // CHECK RESPONSE
             // =========================
 
-            if (!res.data || !res.data.token) {
+            if (
+                !res.data ||
+                !res.data.token
+            ) {
 
                 console.error(
                     "Login response:",
@@ -61,13 +67,21 @@ export default function Login() {
                 );
 
                 throw new Error(
-                    "Login succeeded but no token was received from the server."
+                    "Login succeeded but no token was received."
                 );
             }
 
 
             // =========================
-            // SAVE TOKEN
+            // CLEAR OLD TOKEN
+            // =========================
+
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+
+
+            // =========================
+            // SAVE NEW TOKEN
             // =========================
 
             localStorage.setItem(
@@ -91,7 +105,7 @@ export default function Login() {
 
 
             // =========================
-            // VERIFY TOKEN WAS SAVED
+            // VERIFY TOKEN
             // =========================
 
             const savedToken =
@@ -100,18 +114,14 @@ export default function Login() {
             if (!savedToken) {
 
                 throw new Error(
-                    "Token could not be saved in browser storage."
+                    "Token could not be saved."
                 );
+
             }
 
 
             console.log(
                 "Login successful"
-            );
-
-            console.log(
-                "Token saved:",
-                savedToken
             );
 
 
@@ -144,7 +154,6 @@ export default function Login() {
                 error.message ||
                 "Login failed"
             );
-
 
         } finally {
 
@@ -225,4 +234,5 @@ export default function Login() {
         </div>
 
     );
+
 }

@@ -14,6 +14,9 @@ import {
 
 import "../App.css";
 
+const API_URL =
+    process.env.REACT_APP_API_URL || "http://localhost:5000";
+
 export default function JobApplicationForm() {
 
     const navigate = useNavigate();
@@ -26,7 +29,6 @@ export default function JobApplicationForm() {
         useState(false);
 
     const logout = () => {
-
         localStorage.removeItem("token");
         localStorage.removeItem("user");
 
@@ -36,22 +38,19 @@ export default function JobApplicationForm() {
     };
 
     const confirmLogout = () => {
-
         setShowLogoutConfirm(false);
-
         logout();
     };
 
 
     // =========================
-    // APPLICATIONS
+    // APPLICATION STATE
     // =========================
 
     const [applications, setApplications] =
         useState([]);
 
     const [form, setForm] = useState({
-
         companyName: "",
         jobRole: "",
         location: "",
@@ -63,7 +62,6 @@ export default function JobApplicationForm() {
         jobType: "Full-time",
         workMode: "On-site",
         jobLink: ""
-
     });
 
     const [editingId, setEditingId] =
@@ -75,6 +73,38 @@ export default function JobApplicationForm() {
     const [filterStatus, setFilterStatus] =
         useState("All");
 
+    const [loading, setLoading] =
+        useState(false);
+
+
+    // =========================
+    // GET TOKEN
+    // =========================
+
+    const getToken = () => {
+        return localStorage.getItem("token");
+    };
+
+
+    // =========================
+    // AUTH CONFIG
+    // =========================
+
+    const getAuthConfig = () => {
+
+        const token = getToken();
+
+        if (!token) {
+            return null;
+        }
+
+        return {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        };
+    };
+
 
     // =========================
     // FETCH APPLICATIONS
@@ -82,33 +112,75 @@ export default function JobApplicationForm() {
 
     const fetchApplications = async () => {
 
+        const config = getAuthConfig();
+
+        if (!config) {
+            navigate("/login", {
+                replace: true
+            });
+            return;
+        }
+
         try {
 
-            const token =
-                localStorage.getItem("token");
+            setLoading(true);
 
-            const res = await axios.get(
-                "http://localhost:5000/applications",
-                {
-                    headers: {
-                        Authorization:
-                            `Bearer ${token}`
-                    }
-                }
+            const response = await axios.get(
+                `${API_URL}/applications`,
+                config
             );
 
-            setApplications(res.data);
+            setApplications(
+                Array.isArray(response.data)
+                    ? response.data
+                    : []
+            );
 
-        } catch (err) {
+        } catch (error) {
 
             console.error(
                 "Error fetching applications:",
-                err
+                error
             );
+
+            if (
+                error.response &&
+                (
+                    error.response.status === 401 ||
+                    error.response.status === 403
+                )
+            ) {
+
+                alert(
+                    "Your session has expired. Please login again."
+                );
+
+                localStorage.removeItem("token");
+                localStorage.removeItem("user");
+
+                navigate("/login", {
+                    replace: true
+                });
+
+                return;
+            }
+
+            alert(
+                error.response?.data?.message ||
+                "Unable to fetch applications."
+            );
+
+        } finally {
+
+            setLoading(false);
 
         }
     };
 
+
+    // =========================
+    // LOAD DATA
+    // =========================
 
     useEffect(() => {
 
@@ -150,31 +222,26 @@ export default function JobApplicationForm() {
 
 
     // =========================
-    // BAR GRAPH DATA
+    // CHART DATA
     // =========================
 
     const chartData = [
-
         {
             status: "Applied",
             count: appliedCount
         },
-
         {
             status: "Interview",
             count: interviewCount
         },
-
         {
             status: "Selected",
             count: selectedCount
         },
-
         {
             status: "Rejected",
             count: rejectedCount
         }
-
     ];
 
 
@@ -186,22 +253,22 @@ export default function JobApplicationForm() {
         applications.filter((app) => {
 
             const searchText =
-                search.toLowerCase();
+                search.trim().toLowerCase();
 
             const companyName =
-                app.companyName
-                    ? app.companyName.toLowerCase()
-                    : "";
+                String(
+                    app.companyName || ""
+                ).toLowerCase();
 
             const jobRole =
-                app.jobRole
-                    ? app.jobRole.toLowerCase()
-                    : "";
+                String(
+                    app.jobRole || ""
+                ).toLowerCase();
 
             const location =
-                app.location
-                    ? app.location.toLowerCase()
-                    : "";
+                String(
+                    app.location || ""
+                ).toLowerCase();
 
             const matchesSearch =
                 companyName.includes(searchText) ||
@@ -216,7 +283,6 @@ export default function JobApplicationForm() {
                 matchesSearch &&
                 matchesStatus
             );
-
         });
 
 
@@ -226,14 +292,15 @@ export default function JobApplicationForm() {
 
     const handleChange = (e) => {
 
-        setForm({
+        const {
+            name,
+            value
+        } = e.target;
 
-            ...form,
-
-            [e.target.name]:
-                e.target.value
-
-        });
+        setForm((previousForm) => ({
+            ...previousForm,
+            [name]: value
+        }));
     };
 
 
@@ -244,7 +311,6 @@ export default function JobApplicationForm() {
     const resetForm = () => {
 
         setForm({
-
             companyName: "",
             jobRole: "",
             location: "",
@@ -256,7 +322,6 @@ export default function JobApplicationForm() {
             jobType: "Full-time",
             workMode: "On-site",
             jobLink: ""
-
         });
 
         setEditingId(null);
@@ -264,7 +329,7 @@ export default function JobApplicationForm() {
 
 
     // =========================
-    // ADD / UPDATE APPLICATION
+    // ADD / UPDATE
     // =========================
 
     const handleSubmit = async (e) => {
@@ -272,44 +337,42 @@ export default function JobApplicationForm() {
         e.preventDefault();
 
         if (
-            !form.companyName ||
-            !form.jobRole
+            !form.companyName.trim() ||
+            !form.jobRole.trim()
         ) {
 
             alert(
-                "Company Name and Job Role are required"
+                "Company Name and Job Role are required."
             );
+
+            return;
+        }
+
+        const config = getAuthConfig();
+
+        if (!config) {
+
+            alert(
+                "Please login again."
+            );
+
+            navigate("/login", {
+                replace: true
+            });
 
             return;
         }
 
         try {
 
-            const token =
-                localStorage.getItem("token");
-
-            const config = {
-
-                headers: {
-
-                    Authorization:
-                        `Bearer ${token}`
-
-                }
-
-            };
-
+            setLoading(true);
 
             if (editingId) {
 
                 await axios.put(
-
-                    `http://localhost:5000/applications/${editingId}`,
-
+                    `${API_URL}/applications/${editingId}`,
                     form,
-
                     config
-
                 );
 
                 alert(
@@ -319,13 +382,9 @@ export default function JobApplicationForm() {
             } else {
 
                 await axios.post(
-
-                    "http://localhost:5000/applications",
-
+                    `${API_URL}/applications`,
                     form,
-
                     config
-
                 );
 
                 alert(
@@ -333,22 +392,48 @@ export default function JobApplicationForm() {
                 );
             }
 
-
             resetForm();
 
-            fetchApplications();
+            await fetchApplications();
 
-        } catch (err) {
+        } catch (error) {
 
             console.error(
                 "Error saving application:",
-                err
+                error
             );
 
+            if (
+                error.response &&
+                (
+                    error.response.status === 401 ||
+                    error.response.status === 403
+                )
+            ) {
+
+                alert(
+                    "Your session has expired. Please login again."
+                );
+
+                localStorage.removeItem("token");
+                localStorage.removeItem("user");
+
+                navigate("/login", {
+                    replace: true
+                });
+
+                return;
+            }
+
             alert(
-                err.response?.data?.message ||
-                "Error saving application. Check your backend."
+                error.response?.data?.message ||
+                "Error saving application."
             );
+
+        } finally {
+
+            setLoading(false);
+
         }
     };
 
@@ -360,7 +445,6 @@ export default function JobApplicationForm() {
     const editApplication = (application) => {
 
         setForm({
-
             companyName:
                 application.companyName || "",
 
@@ -393,7 +477,6 @@ export default function JobApplicationForm() {
 
             jobLink:
                 application.jobLink || ""
-
         });
 
         setEditingId(
@@ -401,11 +484,8 @@ export default function JobApplicationForm() {
         );
 
         window.scrollTo({
-
             top: 0,
-
             behavior: "smooth"
-
         });
     };
 
@@ -422,42 +502,73 @@ export default function JobApplicationForm() {
             );
 
         if (!confirmDelete) {
+            return;
+        }
+
+        const config = getAuthConfig();
+
+        if (!config) {
+
+            navigate("/login", {
+                replace: true
+            });
 
             return;
         }
 
         try {
 
-            const token =
-                localStorage.getItem("token");
+            setLoading(true);
 
             await axios.delete(
-
-                `http://localhost:5000/applications/${id}`,
-
-                {
-                    headers: {
-
-                        Authorization:
-                            `Bearer ${token}`
-
-                    }
-                }
-
-            );
-
-            fetchApplications();
-
-        } catch (err) {
-
-            console.error(
-                "Error deleting application:",
-                err
+                `${API_URL}/applications/${id}`,
+                config
             );
 
             alert(
+                "Application deleted successfully!"
+            );
+
+            await fetchApplications();
+
+        } catch (error) {
+
+            console.error(
+                "Error deleting application:",
+                error
+            );
+
+            if (
+                error.response &&
+                (
+                    error.response.status === 401 ||
+                    error.response.status === 403
+                )
+            ) {
+
+                alert(
+                    "Your session has expired. Please login again."
+                );
+
+                localStorage.removeItem("token");
+                localStorage.removeItem("user");
+
+                navigate("/login", {
+                    replace: true
+                });
+
+                return;
+            }
+
+            alert(
+                error.response?.data?.message ||
                 "Unable to delete application."
             );
+
+        } finally {
+
+            setLoading(false);
+
         }
     };
 
@@ -470,15 +581,11 @@ export default function JobApplicationForm() {
 
         <div className="app-layout">
 
-
             {/* =========================
                 SIDEBAR
             ========================= */}
 
             <aside className="sidebar">
-
-
-                {/* SIDEBAR BRAND */}
 
                 <div className="sidebar-brand">
 
@@ -501,12 +608,7 @@ export default function JobApplicationForm() {
                 </div>
 
 
-                {/* SIDEBAR MENU */}
-
                 <nav className="sidebar-menu">
-
-
-                    {/* DASHBOARD */}
 
                     <NavLink
                         to="/dashboard"
@@ -531,8 +633,6 @@ export default function JobApplicationForm() {
                     </NavLink>
 
 
-                    {/* APPLICATIONS */}
-
                     <NavLink
                         to="/applications"
                         className={({ isActive }) =>
@@ -555,8 +655,6 @@ export default function JobApplicationForm() {
                     </NavLink>
 
 
-                    {/* PROFILE */}
-
                     <NavLink
                         to="/profile"
                         className={({ isActive }) =>
@@ -578,8 +676,6 @@ export default function JobApplicationForm() {
 
                     </NavLink>
 
-
-                    {/* SETTINGS */}
 
                     <NavLink
                         to="/settings"
@@ -605,11 +701,10 @@ export default function JobApplicationForm() {
                 </nav>
 
 
-                {/* SIDEBAR LOGOUT */}
-
                 <div className="sidebar-bottom">
 
                     <button
+                        type="button"
                         className="sidebar-item logout-sidebar"
                         onClick={() =>
                             setShowLogoutConfirm(true)
@@ -628,7 +723,6 @@ export default function JobApplicationForm() {
 
                 </div>
 
-
             </aside>
 
 
@@ -637,7 +731,6 @@ export default function JobApplicationForm() {
             ========================= */}
 
             <main className="main-content">
-
 
                 {/* MOBILE HEADER */}
 
@@ -650,31 +743,31 @@ export default function JobApplicationForm() {
                 </div>
 
 
-                {/* =========================
-                    TOP HEADER
-                ========================= */}
+                {/* TOP HEADER */}
 
                 <div className="top-bar">
 
-    <div className="brand-section">
+                    <div className="brand-section">
 
-        <div className="brand-icon">
-            💼
-        </div>
+                        <div className="brand-icon">
+                            💼
+                        </div>
 
-        <div>
-            <h1 className="main-title">
-                Job Application Tracker
-            </h1>
+                        <div>
 
-            <p className="welcome-text">
-                Manage your job applications
-            </p>
-        </div>
+                            <h1 className="main-title">
+                                Job Application Tracker
+                            </h1>
 
-    </div>
+                            <p className="welcome-text">
+                                Manage your job applications
+                            </p>
 
-</div>
+                        </div>
+
+                    </div>
+
+                </div>
 
 
                 {/* =========================
@@ -682,7 +775,6 @@ export default function JobApplicationForm() {
                 ========================= */}
 
                 <div className="dashboard">
-
 
                     <div className="card">
 
@@ -748,12 +840,11 @@ export default function JobApplicationForm() {
 
                     </div>
 
-
                 </div>
 
 
                 {/* =========================
-                    BAR GRAPH
+                    BAR CHART
                 ========================= */}
 
                 <div className="chart-container">
@@ -810,11 +901,9 @@ export default function JobApplicationForm() {
                 <div className="form-section">
 
                     <h2>
-
                         {editingId
                             ? "Edit Job Application"
                             : "Add Job Application"}
-
                     </h2>
 
 
@@ -822,13 +911,13 @@ export default function JobApplicationForm() {
                         onSubmit={handleSubmit}
                     >
 
-
                         <input
                             type="text"
                             name="companyName"
                             placeholder="Company Name"
                             value={form.companyName}
                             onChange={handleChange}
+                            required
                         />
 
 
@@ -838,6 +927,7 @@ export default function JobApplicationForm() {
                             placeholder="Job Role"
                             value={form.jobRole}
                             onChange={handleChange}
+                            required
                         />
 
 
@@ -963,11 +1053,14 @@ export default function JobApplicationForm() {
 
                         <button
                             type="submit"
+                            disabled={loading}
                         >
 
-                            {editingId
-                                ? "Update Application"
-                                : "Add Application"}
+                            {loading
+                                ? "Please wait..."
+                                : editingId
+                                    ? "Update Application"
+                                    : "Add Application"}
 
                         </button>
 
@@ -977,6 +1070,7 @@ export default function JobApplicationForm() {
                             <button
                                 type="button"
                                 onClick={resetForm}
+                                disabled={loading}
                             >
                                 Cancel
                             </button>
@@ -994,14 +1088,12 @@ export default function JobApplicationForm() {
 
                 <div className="search-section">
 
-
                     <h2>
                         Job Applications
                     </h2>
 
 
                     <div className="filters">
-
 
                         <input
                             type="text"
@@ -1046,19 +1138,16 @@ export default function JobApplicationForm() {
 
                         </select>
 
-
                     </div>
 
 
                     {/* =========================
-                        APPLICATION TABLE
+                        TABLE
                     ========================= */}
 
                     <div className="table-container">
 
-
                         <table>
-
 
                             <thead>
 
@@ -1119,7 +1208,6 @@ export default function JobApplicationForm() {
 
                             <tbody>
 
-
                                 {filteredApplications.length === 0 ? (
 
                                     <tr>
@@ -1131,7 +1219,9 @@ export default function JobApplicationForm() {
                                                     "center"
                                             }}
                                         >
-                                            No applications found
+                                            {loading
+                                                ? "Loading applications..."
+                                                : "No applications found"}
                                         </td>
 
                                     </tr>
@@ -1146,19 +1236,17 @@ export default function JobApplicationForm() {
                                             >
 
                                                 <td>
-                                                    {app.companyName}
+                                                    {app.companyName || "-"}
                                                 </td>
 
                                                 <td>
-                                                    {app.jobRole}
+                                                    {app.jobRole || "-"}
                                                 </td>
 
                                                 <td>
-                                                    {app.location}
+                                                    {app.location || "-"}
                                                 </td>
 
-
-                                                {/* STATUS */}
 
                                                 <td>
 
@@ -1170,47 +1258,48 @@ export default function JobApplicationForm() {
                                                             ).toLowerCase()
                                                         }`}
                                                     >
-                                                        {app.status}
+                                                        {app.status || "-"}
                                                     </span>
 
                                                 </td>
 
 
                                                 <td>
-                                                    {app.appliedDate}
+                                                    {app.appliedDate || "-"}
                                                 </td>
+
 
                                                 <td>
                                                     {app.salary || "-"}
                                                 </td>
 
+
                                                 <td>
                                                     {app.jobType || "-"}
                                                 </td>
+
 
                                                 <td>
                                                     {app.workMode || "-"}
                                                 </td>
 
+
                                                 <td>
                                                     {app.email || "-"}
                                                 </td>
+
 
                                                 <td>
                                                     {app.phone || "-"}
                                                 </td>
 
 
-                                                {/* JOB LINK */}
-
                                                 <td>
 
                                                     {app.jobLink ? (
 
                                                         <a
-                                                            href={
-                                                                app.jobLink
-                                                            }
+                                                            href={app.jobLink}
                                                             target="_blank"
                                                             rel="noreferrer"
                                                         >
@@ -1218,18 +1307,13 @@ export default function JobApplicationForm() {
                                                         </a>
 
                                                     ) : (
-
                                                         "-"
-
                                                     )}
 
                                                 </td>
 
 
-                                                {/* ACTIONS */}
-
                                                 <td>
-
 
                                                     <button
                                                         type="button"
@@ -1238,6 +1322,7 @@ export default function JobApplicationForm() {
                                                                 app
                                                             )
                                                         }
+                                                        disabled={loading}
                                                     >
                                                         Edit
                                                     </button>
@@ -1250,10 +1335,10 @@ export default function JobApplicationForm() {
                                                                 app._id
                                                             )
                                                         }
+                                                        disabled={loading}
                                                     >
                                                         Delete
                                                     </button>
-
 
                                                 </td>
 
@@ -1264,9 +1349,7 @@ export default function JobApplicationForm() {
 
                                 )}
 
-
                             </tbody>
-
 
                         </table>
 
@@ -1276,7 +1359,7 @@ export default function JobApplicationForm() {
 
 
                 {/* =========================
-                    LOGOUT CONFIRMATION
+                    LOGOUT MODAL
                 ========================= */}
 
                 {showLogoutConfirm && (
@@ -1285,11 +1368,9 @@ export default function JobApplicationForm() {
 
                         <div className="logout-modal">
 
-
                             <h2>
                                 Logout?
                             </h2>
-
 
                             <p>
                                 Are you sure you want to logout?
@@ -1298,8 +1379,8 @@ export default function JobApplicationForm() {
 
                             <div className="logout-modal-actions">
 
-
                                 <button
+                                    type="button"
                                     className="cancel-logout"
                                     onClick={() =>
                                         setShowLogoutConfirm(
@@ -1312,15 +1393,14 @@ export default function JobApplicationForm() {
 
 
                                 <button
+                                    type="button"
                                     className="confirm-logout"
                                     onClick={confirmLogout}
                                 >
                                     Logout
                                 </button>
 
-
                             </div>
-
 
                         </div>
 
@@ -1328,11 +1408,8 @@ export default function JobApplicationForm() {
 
                 )}
 
-
             </main>
 
         </div>
-
     );
-
 }

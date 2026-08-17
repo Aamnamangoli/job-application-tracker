@@ -98,7 +98,9 @@ app.get(
 // =========================
 
 mongoose
-    .connect(MONGO_URI)
+    .connect(MONGO_URI, {
+        serverSelectionTimeoutMS: 10000
+    })
     .then(() => {
 
         console.log(

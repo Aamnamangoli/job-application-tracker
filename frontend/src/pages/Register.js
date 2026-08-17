@@ -2,6 +2,9 @@ import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
 
+const API_URL =
+    process.env.REACT_APP_API_URL || "http://localhost:5000";
+
 export default function Register() {
 
     const navigate = useNavigate();
@@ -14,41 +17,95 @@ export default function Register() {
 
     const [loading, setLoading] = useState(false);
 
+
     const handleChange = (e) => {
+
         setForm({
             ...form,
             [e.target.name]: e.target.value
         });
+
     };
+
 
     const handleSubmit = async (e) => {
 
         e.preventDefault();
 
-        if (!form.name || !form.email || !form.password) {
-            alert("Please fill all fields");
+
+        // =========================
+        // VALIDATION
+        // =========================
+
+        if (
+            !form.name.trim() ||
+            !form.email.trim() ||
+            !form.password
+        ) {
+
+            alert(
+                "Please fill all fields"
+            );
+
             return;
         }
 
-        if (form.password.length < 6) {
-            alert("Password must contain at least 6 characters");
+
+        if (
+            form.password.length < 6
+        ) {
+
+            alert(
+                "Password must contain at least 6 characters"
+            );
+
             return;
         }
+
 
         try {
 
             setLoading(true);
 
+
+            // =========================
+            // REGISTER
+            // =========================
+
             const res = await axios.post(
-                "http://localhost:5000/auth/register",
-                form
+                `${API_URL}/auth/register`,
+                {
+                    name: form.name.trim(),
+                    email: form.email.trim(),
+                    password: form.password
+                }
             );
 
-            alert(res.data.message);
 
-            navigate("/login");
+            alert(
+                res.data.message ||
+                "Registration successful!"
+            );
+
+
+            // =========================
+            // GO TO LOGIN
+            // =========================
+
+            navigate(
+                "/login",
+                {
+                    replace: true
+                }
+            );
+
 
         } catch (error) {
+
+            console.error(
+                "Registration error:",
+                error
+            );
 
             alert(
                 error.response?.data?.message ||
@@ -60,20 +117,28 @@ export default function Register() {
             setLoading(false);
 
         }
+
     };
 
+
     return (
+
         <div className="auth-page">
 
             <div className="auth-card">
 
-                <h1>Create Account</h1>
+                <h1>
+                    Create Account
+                </h1>
 
                 <p className="auth-subtitle">
                     Register for Job Application Tracker
                 </p>
 
-                <form onSubmit={handleSubmit}>
+
+                <form
+                    onSubmit={handleSubmit}
+                >
 
                     <input
                         type="text"
@@ -81,7 +146,10 @@ export default function Register() {
                         placeholder="Full Name"
                         value={form.name}
                         onChange={handleChange}
+                        autoComplete="name"
+                        required
                     />
+
 
                     <input
                         type="email"
@@ -89,7 +157,10 @@ export default function Register() {
                         placeholder="Email Address"
                         value={form.email}
                         onChange={handleChange}
+                        autoComplete="email"
+                        required
                     />
+
 
                     <input
                         type="password"
@@ -97,28 +168,39 @@ export default function Register() {
                         placeholder="Password"
                         value={form.password}
                         onChange={handleChange}
+                        autoComplete="new-password"
+                        required
                     />
+
 
                     <button
                         type="submit"
                         disabled={loading}
                     >
+
                         {loading
                             ? "Creating Account..."
                             : "Register"}
+
                     </button>
 
                 </form>
 
+
                 <p className="auth-footer">
+
                     Already have an account?{" "}
+
                     <Link to="/login">
                         Login
                     </Link>
+
                 </p>
 
             </div>
 
         </div>
+
     );
+
 }

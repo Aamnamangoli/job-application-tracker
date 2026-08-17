@@ -14,14 +14,49 @@ import {
 
 import "../App.css";
 
+const API_URL =
+    process.env.REACT_APP_API_URL || "http://localhost:5000";
+
 export default function Dashboard() {
 
     const navigate = useNavigate();
 
-    const [applications, setApplications] = useState([]);
+    const [applications, setApplications] =
+        useState([]);
 
     const [showLogoutConfirm, setShowLogoutConfirm] =
         useState(false);
+
+    const [loading, setLoading] =
+        useState(true);
+
+
+    // =========================
+    // LOGOUT
+    // =========================
+
+    const logout = () => {
+
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+
+        navigate(
+            "/login",
+            {
+                replace: true
+            }
+        );
+
+    };
+
+
+    const confirmLogout = () => {
+
+        setShowLogoutConfirm(false);
+
+        logout();
+
+    };
 
 
     // =========================
@@ -30,22 +65,50 @@ export default function Dashboard() {
 
     const fetchApplications = async () => {
 
-        try {
+        const token =
+            localStorage.getItem("token");
 
-            const token =
-                localStorage.getItem("token");
 
-            const response = await axios.get(
-                "http://localhost:5000/applications",
+        // No token
+        if (!token) {
+
+            navigate(
+                "/login",
                 {
-                    headers: {
-                        Authorization:
-                            `Bearer ${token}`
-                    }
+                    replace: true
                 }
             );
 
-            setApplications(response.data);
+            return;
+
+        }
+
+
+        try {
+
+            setLoading(true);
+
+
+            const response =
+                await axios.get(
+                    `${API_URL}/applications`,
+                    {
+                        headers: {
+                            Authorization:
+                                `Bearer ${token}`
+                        }
+                    }
+                );
+
+
+            setApplications(
+                Array.isArray(
+                    response.data
+                )
+                    ? response.data
+                    : []
+            );
+
 
         } catch (error) {
 
@@ -54,10 +117,58 @@ export default function Dashboard() {
                 error
             );
 
+
+            // =========================
+            // TOKEN ERROR
+            // =========================
+
+            if (
+                error.response?.status === 401 ||
+                error.response?.status === 403
+            ) {
+
+                alert(
+                    "Your login session has expired. Please login again."
+                );
+
+                localStorage.removeItem(
+                    "token"
+                );
+
+                localStorage.removeItem(
+                    "user"
+                );
+
+                navigate(
+                    "/login",
+                    {
+                        replace: true
+                    }
+                );
+
+                return;
+
+            }
+
+
+            alert(
+                error.response?.data?.message ||
+                "Unable to load applications."
+            );
+
+
+        } finally {
+
+            setLoading(false);
+
         }
 
     };
 
+
+    // =========================
+    // LOAD DATA
+    // =========================
 
     useEffect(() => {
 
@@ -67,11 +178,12 @@ export default function Dashboard() {
 
 
     // =========================
-    // DASHBOARD COUNTS
+    // COUNTS
     // =========================
 
     const totalApplications =
         applications.length;
+
 
     const appliedCount =
         applications.filter(
@@ -79,17 +191,20 @@ export default function Dashboard() {
                 app.status === "Applied"
         ).length;
 
+
     const interviewCount =
         applications.filter(
             (app) =>
                 app.status === "Interview"
         ).length;
 
+
     const selectedCount =
         applications.filter(
             (app) =>
                 app.status === "Selected"
         ).length;
+
 
     const rejectedCount =
         applications.filter(
@@ -99,7 +214,7 @@ export default function Dashboard() {
 
 
     // =========================
-    // BAR GRAPH DATA
+    // CHART DATA
     // =========================
 
     const chartData = [
@@ -127,31 +242,6 @@ export default function Dashboard() {
     ];
 
 
-    // =========================
-    // LOGOUT
-    // =========================
-
-    const logout = () => {
-
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-
-        navigate("/login", {
-            replace: true
-        });
-
-    };
-
-
-    const confirmLogout = () => {
-
-        setShowLogoutConfirm(false);
-
-        logout();
-
-    };
-
-
     return (
 
         <div className="app-layout">
@@ -162,9 +252,6 @@ export default function Dashboard() {
             ========================= */}
 
             <aside className="sidebar">
-
-
-                {/* BRAND */}
 
                 <div className="sidebar-brand">
 
@@ -186,8 +273,6 @@ export default function Dashboard() {
 
                 </div>
 
-
-                {/* NAVIGATION */}
 
                 <nav className="sidebar-menu">
 
@@ -280,18 +365,18 @@ export default function Dashboard() {
 
                     </NavLink>
 
-
                 </nav>
 
-
-                {/* LOGOUT */}
 
                 <div className="sidebar-bottom">
 
                     <button
+                        type="button"
                         className="sidebar-item logout-sidebar"
                         onClick={() =>
-                            setShowLogoutConfirm(true)
+                            setShowLogoutConfirm(
+                                true
+                            )
                         }
                     >
 
@@ -307,18 +392,15 @@ export default function Dashboard() {
 
                 </div>
 
-
             </aside>
 
 
             {/* =========================
-                MAIN CONTENT
+                MAIN
             ========================= */}
 
             <main className="main-content">
 
-
-                {/* MOBILE HEADER */}
 
                 <div className="mobile-header">
 
@@ -330,7 +412,7 @@ export default function Dashboard() {
 
 
                 {/* =========================
-                    TOP HEADER
+                    HEADER
                 ========================= */}
 
                 <div className="top-bar">
@@ -359,7 +441,7 @@ export default function Dashboard() {
 
 
                 {/* =========================
-                    DASHBOARD CARDS
+                    CARDS
                 ========================= */}
 
                 <div className="dashboard">
@@ -429,12 +511,11 @@ export default function Dashboard() {
 
                     </div>
 
-
                 </div>
 
 
                 {/* =========================
-                    APPLICATION STATUS GRAPH
+                    CHART
                 ========================= */}
 
                 <div className="chart-container">
@@ -443,43 +524,54 @@ export default function Dashboard() {
                         Application Status
                     </h2>
 
-                    <ResponsiveContainer
-                        width="100%"
-                        height={350}
-                    >
 
-                        <BarChart
-                            data={chartData}
-                            margin={{
-                                top: 20,
-                                right: 30,
-                                left: 20,
-                                bottom: 20
-                            }}
+                    {loading ? (
+
+                        <p>
+                            Loading applications...
+                        </p>
+
+                    ) : (
+
+                        <ResponsiveContainer
+                            width="100%"
+                            height={350}
                         >
 
-                            <CartesianGrid
-                                strokeDasharray="3 3"
-                            />
+                            <BarChart
+                                data={chartData}
+                                margin={{
+                                    top: 20,
+                                    right: 30,
+                                    left: 20,
+                                    bottom: 20
+                                }}
+                            >
 
-                            <XAxis
-                                dataKey="status"
-                            />
+                                <CartesianGrid
+                                    strokeDasharray="3 3"
+                                />
 
-                            <YAxis
-                                allowDecimals={false}
-                            />
+                                <XAxis
+                                    dataKey="status"
+                                />
 
-                            <Tooltip />
+                                <YAxis
+                                    allowDecimals={false}
+                                />
 
-                            <Bar
-                                dataKey="count"
-                                name="Applications"
-                            />
+                                <Tooltip />
 
-                        </BarChart>
+                                <Bar
+                                    dataKey="count"
+                                    name="Applications"
+                                />
 
-                    </ResponsiveContainer>
+                            </BarChart>
+
+                        </ResponsiveContainer>
+
+                    )}
 
                 </div>
 
@@ -488,7 +580,7 @@ export default function Dashboard() {
 
 
             {/* =========================
-                LOGOUT CONFIRMATION
+                LOGOUT MODAL
             ========================= */}
 
             {showLogoutConfirm && (
@@ -508,7 +600,9 @@ export default function Dashboard() {
 
                         <div className="logout-modal-actions">
 
+
                             <button
+                                type="button"
                                 className="cancel-logout"
                                 onClick={() =>
                                     setShowLogoutConfirm(
@@ -521,11 +615,13 @@ export default function Dashboard() {
 
 
                             <button
+                                type="button"
                                 className="confirm-logout"
                                 onClick={confirmLogout}
                             >
                                 Logout
                             </button>
+
 
                         </div>
 
@@ -534,7 +630,6 @@ export default function Dashboard() {
                 </div>
 
             )}
-
 
         </div>
 
