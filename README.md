@@ -699,3 +699,29 @@ If you find this project useful, consider giving the repository a ⭐ on GitHub.
 ## 📄 License
 
 This project is created for **educational and portfolio purposes**.
+
+## Screenshots
+
+### Login
+
+![Login Page](screenshots/login.png)
+
+### Register
+
+![Register Page](screenshots/register.png)
+
+### Dashboard
+
+![Dashboard](screenshots/dashboard.png)
+
+### Applications
+
+![Applications Page](screenshots/applications.png)
+
+### Profile
+
+![Profile Page](screenshots/profile.png)
+
+### Settings
+
+![Settings Page](screenshots/settings.png)
